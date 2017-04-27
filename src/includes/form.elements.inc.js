@@ -157,7 +157,7 @@ function _drupalgap_form_render_elements(form) {
               var weight =
                 drupalgap.field_info_extra_fields[bundle][name].weight;
               if (content_weighted[weight]) {
-                var msg = 'WARNING: _drupalgap_form_render_elements - the ' + 
+                var msg = 'WARNING: _drupalgap_form_render_elements - the ' +
                 'weight of ' + weight + ' for ' + element.name + ' is ' +
                 'already in use by ' + content_weighted[weight].name;
                 console.log(msg);
@@ -228,6 +228,11 @@ function _drupalgap_form_render_element(form, element) {
 
     // Grab the language.
     var language = language_default();
+
+    if (element.und) {
+		  element.und = $.extend(true,element.und,element[language]);
+		  language = 'und'
+		};
 
     // We'll assume the element has no items (e.g. title, nid, vid, etc), unless
     // we determine later that this element is a field, then it'll have items.
@@ -347,6 +352,10 @@ function _drupalgap_form_render_element(form, element) {
               delta,
               element
           ]);
+          // hook above may change item.value (see date.js), so put again in variables
+          if (typeof item.value !== 'undefined') {
+            variables.attributes.value = item.value;
+          }
           item = $.extend(true, item, items[delta]);
           // If the item type got lost, replace it.
           if (!item.type && element.type) { item.type = element.type; }
@@ -633,4 +642,3 @@ function _drupalgap_form_element_items_widget_arguments(form, form_state,
     console.log('_drupalgap_form_element_items_widget_arguments - ' + error);
   }
 }
-

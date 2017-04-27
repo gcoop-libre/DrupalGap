@@ -722,4 +722,3 @@ function text_field_widget_form(form, form_state, field, instance, langcode, ite
   }
   catch (error) { console.log('text_field_widget_form - ' + error); }
 }
-
