@@ -49,6 +49,11 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
     if (typeof items[language_default()] !== 'undefined') {
       items = items[language_default()];
     }
+    else {
+      if (typeof items['und'] !== 'undefined') {
+        items = items['und'];
+      }
+    }
     if (!empty(items)) {
       for (var delta in items) {
           if (!items.hasOwnProperty(delta)) { continue; }
@@ -837,27 +842,29 @@ function _theme_taxonomy_term_reference_load_items(options) {
               _taxonomy_term_reference_terms[options.element_id]['All'] =
                 '- Any -';
             }
-            else {
+            //Already implemented in options_field_widget_form()
+            /*else {
               option = '<option value="">- ' + t('None') + ' -</option>';
               _taxonomy_term_reference_terms[options.element_id][''] =
                 '- None -';
-            }
+            }*/
             $(widget).append(option);
           }
 
           // Place each term in the widget as an option, and set the option
           // aside.
+          // Gets the default_value index of the options list
+          var default_index = 0;
           for (var index in terms) {
               if (!terms.hasOwnProperty(index)) { continue; }
               var term = terms[index];
-              var option = '<option value="' + term.tid + '">' +
-                term.name +
-              '</option>';
+              var option = '<option value="' + term.tid + '">' + term.name + '</option>';
               $(widget).append(option);
-              _taxonomy_term_reference_terms[options.element_id][term.tid] =
-                term.name;
+              _taxonomy_term_reference_terms[options.element_id][term.tid] = term.name;
+              if (options.default_value == term.tid) default_index = (parseInt(index) + 1);
           }
-
+          //Sets the default value
+          $(widget)[0].selectedIndex = default_index;
           // Refresh the select list.
           $(widget).selectmenu('refresh', true);
         }

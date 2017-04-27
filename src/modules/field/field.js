@@ -138,10 +138,12 @@ function drupalgap_field_info_instances_add_to_form(entity_type, bundle, form, e
             // Make sure the field has some type of language code on it, or just skip it. An entity will sometimes have
             // a language code that a field doesn't have, so fall back to und on the field if the language code isn't
             // present.
-            if (!entity[name][language]) {
+            /*if (!entity[name][language]) {
               if (!entity[name].und) { continue; }
               language = 'und';
-            }
+            }*/
+            //Drupal sets und in all fields
+            language = 'und';
 
             if (!form.elements[name][language]) { form.elements[name][language] = {}; }
 
@@ -151,17 +153,24 @@ function drupalgap_field_info_instances_add_to_form(entity_type, bundle, form, e
               // value_callback property present in Drupal's FAPI? That way
               // each element knows how to map the entity data to its element
               // value property.
-              if (
-                entity[name][language][delta] &&
-                typeof entity[name][language][delta].value !== 'undefined'
-              ) { default_value = entity[name][language][delta].value; }
+              if (entity[name][language][delta] && typeof entity[name][language][delta].value !== 'undefined') {
+                  default_value = entity[name][language][delta].value;
+              }
+              else {
+                if (form.elements[name].type == 'taxonomy_term_reference' && typeof entity[name][language][delta].tid !== 'undefined') {
+                  default_value = entity[name][language][delta].tid;
+                }
+              }
 
               // If the default_value is null, set it to an empty string.
-              if (default_value == null) { default_value = ''; }
+              if (default_value == null) {
+                default_value = '';
+              }
 
               // Note, not all fields have a language code to use here, e.g. taxonomy term reference fields do not.
               form.elements[name][language][delta] = {
-                value: default_value
+                value: default_value,
+                default_value: default_value
               };
 
               // Place the field item onto the element.
@@ -630,7 +639,10 @@ function options_field_widget_form(form, form_state, field, instance, langcode, 
               '_theme_taxonomy_term_reference_load_items',
             'jqm_page_event_args': JSON.stringify({
                 'taxonomy_vocabulary': taxonomy_vocabulary,
-                'widget_id': widget_id
+                'widget_id': widget_id,
+                'element_id': element.id,
+                'required': items[delta].required,
+                'default_value': items[delta].default_value
             })
           };
           // Pass the field name so the page event handler can be called for
