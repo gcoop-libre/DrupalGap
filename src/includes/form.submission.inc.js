@@ -182,20 +182,13 @@ function _drupalgap_form_validate(form, form_state) {
  */
 function drupalgap_form_state_values_assemble(form) {
   try {
-    var lng; // = language_default();
+    var lng = 'und'; // = language_default();
     var form_state = { values: {} };
     for (var name in form.elements) {
       if (!form.elements.hasOwnProperty(name)) { continue; }
       var element = form.elements[name];
       if (name == 'submit') { continue; } // Always skip the form 'submit'.
       var id = null;
-
-      if (element.und) {
-		    lng = 'und'
-  		}
-  	  else {
-  		  lng = language_default();
-  	  }
 
       if (element.is_field) {
         form_state.values[name] = {};
