@@ -421,12 +421,7 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
           // Or is it only single value fields that don't have it? We need to
           // test this.
           var use_delta = true;
-          if (
-            form.elements[name].type ==
-              'taxonomy_term_reference' ||
-            form.elements[name].field_info_instance.widget.type ==
-              'options_select'
-          ) {
+          if (form.elements[name].field_info_instance.widget.type == 'options_select') {
             use_delta = false;
             entity[name][language] = {};
           }
@@ -553,6 +548,11 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
               ) { delete entity[name]; }
 
             }
+          }
+          if (form.elements[name].type == 'taxonomy_term_reference' &&
+              form.elements[name].field_info_instance.widget.type == 'taxonomy_autocomplete' &&
+              typeof(entity[name][language]) != 'undefined') {
+            entity[name][language] = entity[name][language].join(',');
           }
       }
       else if (typeof value !== 'undefined') { entity[name] = value; }

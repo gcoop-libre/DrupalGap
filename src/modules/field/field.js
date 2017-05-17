@@ -157,7 +157,7 @@ function drupalgap_field_info_instances_add_to_form(entity_type, bundle, form, e
                   default_value = entity[name][language][delta].value;
               }
               else {
-                if (form.elements[name].type == 'taxonomy_term_reference' && typeof entity[name][language][delta].tid !== 'undefined') {
+                if (form.elements[name].type == 'taxonomy_term_reference' && typeof entity[name][language][delta] != 'undefined' && typeof entity[name][language][delta].tid != 'undefined') {
                   default_value = entity[name][language][delta].tid;
                 }
               }

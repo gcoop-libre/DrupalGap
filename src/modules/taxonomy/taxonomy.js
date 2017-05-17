@@ -95,42 +95,62 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
  * @param {Number} delta
  * @param {Object} element
  */
-function taxonomy_field_widget_form(form, form_state, field, instance, langcode,
-  items, delta, element) {
-  try {
-    items[delta].type = 'hidden';
-    // Build the widget and attach it to the item.
-    var list_id = items[delta].id + '-list';
-    var widget = {
-      theme: 'item_list',
-      items: [],
-      attributes: {
-        'id': list_id,
-        'data-role': 'listview',
-        'data-filter': 'true',
-        'data-inset': 'true',
-        'data-filter-placeholder': '...'
-      }
-    };
-    items[delta].children.push(widget);
-    // Attach JS to handle the widget's data fetching.
-    var machine_name = field.settings.allowed_values[0].vocabulary;
-    var vocabulary = taxonomy_vocabulary_machine_name_load(machine_name);
-    var vid = vocabulary.vid;
-    var js = '<script type="text/javascript">' +
-      '$("#' + list_id + '").on("filterablebeforefilter",' +
-        'function(e, d) {' +
-          '_taxonomy_field_widget_form_autocomplete(' +
-            '"' + items[delta].id + '", ' + vid + ', this, e, d' +
-          ');' +
-        '}' +
-      ');' +
-    '</script>';
-    items[delta].children.push({
-        markup: js
-    });
-  }
-  catch (error) { console.log('taxonomy_field_widget_form - ' + error); }
+ function taxonomy_field_widget_form(form, form_state, field, instance, langcode,
+   items, delta, element) {
+   try {
+     items[delta].type = 'hidden';
+
+     var lng = language_default();
+     if (typeof(element[lng]) == 'undefined') {
+       lng = 'und';
+     }
+
+     // Build the widget and attach it to the item.
+     var list_id = items[delta].id + '-list';
+     var widget = {
+       theme: 'item_list',
+       items: [],
+       attributes: {
+         'id': list_id,
+         'data-role': 'listview',
+         'data-filter': 'true',
+         'data-inset': 'true',
+         'data-filter-placeholder': ''
+       }
+     };
+     items[delta].children.push(widget);
+     // Attach JS to handle the widget's data fetching.
+     var machine_name = field.settings.allowed_values[0].vocabulary;
+     var vocabulary = taxonomy_vocabulary_machine_name_load(machine_name);
+     var vid = vocabulary.vid;
+     var default_value = '';
+
+     if (typeof(element[lng][delta].item) != 'undefined') {
+       default_value = element[lng][delta].item.name;
+     }
+
+     var js = '<script type="text/javascript">' +
+       '$("#' + list_id + '").on("filterablecreate", function(event, ui) {' +
+         '_taxonomy_field_autocomplete_set_default_value("' + items[delta].id + '","' + default_value + '"); ' +
+       '}).on("filterablebeforefilter",' +
+         'function(e, d) {' +
+           '_taxonomy_field_widget_form_autocomplete(' +
+             '"' + items[delta].id + '", ' + vid + ', this, e, d' +
+           ');' +
+         '}' +
+       '); ' +
+     '</script>';
+     items[delta].children.push({
+         markup: js
+     });
+   }
+   catch (error) { console.log('taxonomy_field_widget_form - ' + error); }
+ }
+
+function _taxonomy_field_autocomplete_set_default_value(field_id, value) {
+  $('#' + field_id).val(value)
+    .next('form')
+      .find("input[data-type=search]").val(value);
 }
 
 var _taxonomy_field_widget_form_autocomplete_input = null;
@@ -246,6 +266,8 @@ function taxonomy_assemble_form_state_into_field(entity_type, bundle,
     switch (instance.widget.type) {
       case 'taxonomy_autocomplete':
         field_key.use_wrapper = false;
+        field_key.use_delta = true;
+        field_key.use_key = false;
         result = form_state_value;
         break;
       case 'options_select':
@@ -853,18 +875,16 @@ function _theme_taxonomy_term_reference_load_items(options) {
 
           // Place each term in the widget as an option, and set the option
           // aside.
-          // Gets the default_value index of the options list
-          var default_index = 0;
           for (var index in terms) {
               if (!terms.hasOwnProperty(index)) { continue; }
               var term = terms[index];
               var option = '<option value="' + term.tid + '">' + term.name + '</option>';
               $(widget).append(option);
               _taxonomy_term_reference_terms[options.element_id][term.tid] = term.name;
-              if (options.default_value == term.tid) default_index = (parseInt(index) + 1);
           }
+
           //Sets the default value
-          $(widget)[0].selectedIndex = default_index;
+          $(widget).val(options.default_value);
           // Refresh the select list.
           $(widget).selectmenu('refresh', true);
         }
