@@ -374,3 +374,17 @@ function t(str) {
   return str;
 }
 
+/**
+ * Formats a string for HTML display by replacing variable placeholders.
+ *
+ * @param {String} str A string containing placeholders.
+ * @return {String}
+ */
+function format_string(str) {
+  var string = str;
+  for (var i = 1; i <= arguments.length; i++) {
+    var reg = new RegExp("\\{" + i + "\\}", "gm");
+    string = string.replace(reg, arguments[i]);
+  }
+  return string;
+}
