@@ -255,23 +255,28 @@ function _taxonomy_field_widget_form_autocomplete(id, vid, list, e, data) {
             success: function(terms) {
               if (terms.length != 0) {
                 // Extract the terms into items, then drop them in the list.
-                var items = [];
+                var items = [value.toLowerCase()];
                 for (var index in terms) {
                     if (!terms.hasOwnProperty(index)) { continue; }
                     var term = terms[index];
-                    var attributes = {
-                      tid: term.tid,
-                      vid: vid,
-                      name: term.name,
-                      onclick: '_taxonomy_field_widget_form_click(' +
-                        "'" + id + "', " +
-                        "'" + $ul.attr('id') + "', " +
-                        'this' +
-                      ')'
-                    };
-                    html += '<li ' + drupalgap_attributes(attributes) + '>' +
-                      term.name +
-                    '</li>';
+                    // Only add a value if it's not added before
+                    if ($.inArray(term.name.toLowerCase(), items) < 0) {
+                        items.push(term.name.toLowerCase());
+
+                        var attributes = {
+                          tid: term.tid,
+                          vid: vid,
+                          name: term.name,
+                          onclick: '_taxonomy_field_widget_form_click(' +
+                            "'" + id + "', " +
+                            "'" + $ul.attr('id') + "', " +
+                            'this' +
+                          ')'
+                        };
+                        html += '<li ' + drupalgap_attributes(attributes) + '>' +
+                          term.name +
+                        '</li>';
+                    }
                 }
               }
               $ul.html(html);
