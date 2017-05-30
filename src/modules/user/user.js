@@ -202,6 +202,51 @@ function user_register_access() {
   catch (error) { console.log('user_register_access - ' + error); }
 }
 
+
+/*
+* Gets y sets in localStorage the user pass reset token
+*/
+function user_pass_reset(user_id, timestamp, hash, options) {
+  var data = {
+    'uid': user_id,
+    'timestamp': timestamp,
+    'hashed_pass': hash
+  };
+  // Send data to drupal service
+  Drupal.services.call({
+    method: 'POST',
+    path: 'user/user_pass_reset.json',
+    data: JSON.stringify(data),
+    success: function (result) {
+      if (typeof (result.pass_reset_token) != 'undefined') {
+        var pass_reset_token = result.pass_reset_token;
+        localStorage.setItem('pass-reset-token', pass_reset_token);
+        user_load(user_id, {
+          success: function(user) {
+            debugger;
+            Drupal.user = user;
+            Drupal.sessid = null;
+            services_get_csrf_token({
+              success: function (token) {
+                drupalgap_goto('user/' + Drupal.user.uid + '/edit');
+              },
+              error: function (error) {
+                console.log('ERROR: ' + error );
+              },
+              reset: true
+            });
+
+          },
+          error: function (error) {
+            console.log('Error al cargar usuario');
+          }
+        });
+
+      }
+    }
+  });
+}
+
 /**
  * Implements hook_services_postprocess().
  * @param {Object} options
@@ -362,4 +407,3 @@ function drupalgap_user_has_role(role) {
   }
   catch (error) { console.log('drupalgap_user_has_role - ' + error); }
 }
-

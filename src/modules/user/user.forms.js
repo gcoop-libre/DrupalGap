@@ -260,7 +260,16 @@ function user_profile_form(form, form_state, account) {
     // Add password fields to the form. We show the current password field only
     // if the user is editing their account. We show the password and confirm
     // password field no matter what.
-    if (Drupal.user.uid == account.uid) {
+
+    // Checks whether the user has requested a password reset to hide the current_pass field
+    var pass_reset = false;
+    if (typeof (localStorage) != 'undefined') {
+      if (localStorage.getItem('pass-reset-token')) {
+        pass_reset = true;
+      }
+    }
+
+    if (Drupal.user.uid == account.uid && !pass_reset) {
       form.elements.current_pass = {
         'title': t('Current password'),
         'type': 'password',
@@ -307,6 +316,7 @@ function user_profile_form_validate(form, form_state) {
   try {
     // If they entered their current password, and entered new passwords, make
     // sure the new passwords match.
+
     if (!empty(form_state.values['current_pass'])) {
       if (
         !empty(form_state.values['pass_pass1']) &&
@@ -323,10 +333,20 @@ function user_profile_form_validate(form, form_state) {
       !empty(form_state.values['pass_pass1']) &&
       !empty(form_state.values['pass_pass2'])
     ) {
-      drupalgap_form_set_error(
-        'current_pass',
-        t('You must enter your current password to change your password.')
-      );
+      // Checks whether the user has requested a password reset to bypass the current_pass empty value
+      if (
+        typeof(localStorage) != 'undefined' &&
+        localStorage.getItem('pass-reset-token') &&
+        form_state.values['pass_pass1'] != form_state.values['pass_pass2']
+      ) {
+        drupalgap_form_set_error('pass_pass1', t('Passwords do not match.'));
+      }
+      else {
+        drupalgap_form_set_error(
+          'current_pass',
+          t('You must enter your current password to change your password.')
+        );
+      }
     }
   }
   catch (error) { console.log('user_profile_form_validate - ' + error); }
@@ -340,10 +360,19 @@ function user_profile_form_validate(form, form_state) {
 function user_profile_form_submit(form, form_state) {
   try {
     var account = drupalgap_entity_build_from_form_state(form, form_state);
-    // If they provided their current password, and their new password, prepare
+    // If they provided their current password or if it's a password reset, and their new password, prepare
     // the account submission values.
+
+    //Checks whether the user has requested a password reset
+    var pass_reset = false;
+    if (typeof (localStorage) != 'undefined') {
+      if (localStorage.getItem('pass-reset-token')) {
+        pass_reset = true;
+      }
+    }
+
     if (
-      account.current_pass &&
+      (account.current_pass || pass_reset) &&
       !empty(account.pass_pass1) &&
       !empty(account.pass_pass2)
     ) {
@@ -355,6 +384,26 @@ function user_profile_form_submit(form, form_state) {
   }
   catch (error) { console.log('user_profile_form_submit - ' + error); }
 }
+
+
+function user_services_preprocess(options) {
+  if (
+    typeof(options.service) != 'undefined' &&
+    options.service == 'user' &&
+    typeof(options.resource) != 'undefined' &&
+    options.resource == 'update'
+  ) {
+    if (typeof (localStorage) != 'undefined') {
+      var pass_reset_token = localStorage.getItem('pass-reset-token');
+      if (pass_reset_token) {
+        options.path += '&pass-reset-token=' + pass_reset_token;
+        localStorage.removeItem('pass-reset-token');
+      }
+    }
+  }
+}
+
+
 
 /**
  * The request new password form.
@@ -406,4 +455,3 @@ function user_pass_form_submit(form, form_state) {
   }
   catch (error) { console.log('user_pass_form_submit - ' + error); }
 }
-
