@@ -141,7 +141,24 @@ function _drupalgap_form_validate(form, form_state) {
   	      }
 
           if (element.is_field) {
-            value = form_state.values[name][lng /*language_default()*/][0];
+            if (
+              (typeof(element['field_info_field']) != 'undefined') &&
+              (typeof(element['field_info_field']['cardinality']) != 'undefined') &&
+              (element['field_info_field']['cardinality'] > 1)
+            ) {
+              value = [];
+
+              for (var index in form_state.values[name][lng]) {
+                if (!form_state.values[name][lng].hasOwnProperty(index)) {
+                  continue;
+                }
+                if (!empty(form_state.values[name][lng][index])) {
+                  value.push(form_state.values[name][lng][index]);
+                }
+              }
+            } else {
+              value = form_state.values[name][lng][0];
+            }
           }
           else { value = form_state.values[name]; }
           // Check for empty values.
