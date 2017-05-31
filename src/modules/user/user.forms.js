@@ -336,10 +336,11 @@ function user_profile_form_validate(form, form_state) {
       // Checks whether the user has requested a password reset to bypass the current_pass empty value
       if (
         typeof(localStorage) != 'undefined' &&
-        localStorage.getItem('pass-reset-token') &&
-        form_state.values['pass_pass1'] != form_state.values['pass_pass2']
+        localStorage.getItem('pass-reset-token')
       ) {
-        drupalgap_form_set_error('pass_pass1', t('Passwords do not match.'));
+        if (form_state.values['pass_pass1'] != form_state.values['pass_pass2']) {
+          drupalgap_form_set_error('pass_pass1', t('Passwords do not match.'));
+        }
       }
       else {
         drupalgap_form_set_error(

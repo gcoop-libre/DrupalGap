@@ -227,20 +227,20 @@ function user_pass_reset(user_id, timestamp, hash, options) {
             Drupal.sessid = null;
             services_get_csrf_token({
               success: function (token) {
+                drupalgap_set_message(t('You have just used your one-time login link. It is no longer necessary to use this link to log in. Please change your password.'));
                 drupalgap_goto('user/' + Drupal.user.uid + '/edit');
               },
               error: function (error) {
-                console.log('ERROR: ' + error );
               },
               reset: true
             });
-
-          },
-          error: function (error) {
-            console.log('Error al cargar usuario');
           }
         });
-
+      }
+    },
+    error: function(error) {
+      if (error.status == '406') {
+        drupalgap_alert(t('You have tried to use a one-time login link that has either been used or is no longer valid. Please request a new one.'));
       }
     }
   });
