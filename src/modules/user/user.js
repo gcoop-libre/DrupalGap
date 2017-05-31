@@ -223,7 +223,6 @@ function user_pass_reset(user_id, timestamp, hash, options) {
         localStorage.setItem('pass-reset-token', pass_reset_token);
         user_load(user_id, {
           success: function(user) {
-            debugger;
             Drupal.user = user;
             Drupal.sessid = null;
             services_get_csrf_token({
