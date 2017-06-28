@@ -1,4 +1,4 @@
-/*! drupalgap 2016-08-15 */
+/*! drupalgap 2017-06-28 */
 // Initialize the drupalgap json object.
 var drupalgap = drupalgap || drupalgap_init(); // Do not remove this line.
 
@@ -1540,8 +1540,8 @@ function scrollToElement(selector, time, verticalOffset) {
  * Autocomplete global variables. Used to hold onto various global variables
  * needed for an autocomplete.
  */
-// The autocomplete text field input selector.
-var _theme_autocomplete_input_selector = {};
+// The autocomplete form selector.
+var _theme_autocomplete_form_selector = {};
 
 // The autocomplete remote boolean.
 var _theme_autocomplete_remote = {};
@@ -1560,6 +1560,7 @@ var _theme_autocomplete_success_handlers = {};
 function theme_autocomplete(variables) {
   try {
     var html = '';
+    var js = '';
 
     // We need to have a unique identifier for this autocomplete. If it is a
     // field, use the field name. Otherwise use the id attribute if it is
@@ -1599,71 +1600,134 @@ function theme_autocomplete(variables) {
     if (
       variables.element &&
       typeof variables.element.default_value !== 'undefined'
-    ) { hidden_attributes.value = variables.element.default_value; }
+    ) {
+      hidden_attributes.value = variables.element.default_value;
+
+      if (!empty(variables.element.default_value)) {
+        label_value = variables.element.default_value;
+        if (
+          (typeof(variables.element.default_value_label) != 'undefined') &&
+          (!empty(variables.element.default_value_label))
+        ) {
+          label_value = variables.element.default_value_label;
+        }
+        html += _theme_autocomplete_value(id, label_value);
+      }
+    }
     html += theme('hidden', { attributes: hidden_attributes });
 
-    // Now we need an id for the list.
-    var list_id = id + '-list';
+    if ((parseInt(variables.delta) + 1) == variables.cardinality) {
+      // Now we need an id for the list.
+      var list_id = variables.element_id + '-list';
 
-    // Build the widget variables.
-    var widget = {
-      attributes: {
-        'id': list_id,
-        'data-role': 'listview',
-        'data-filter': 'true',
-        'data-inset': 'true',
-        'data-filter-placeholder': '...'
+      // Build the widget variables.
+      var widget = {
+        attributes: {
+          'id': list_id,
+          'data-role': 'listview',
+          'data-filter': 'true',
+          'data-inset': 'true',
+          'data-filter-placeholder': '...'
+        }
+      };
+
+      // Handle a remote data set.
+      if (variables.remote) {
+        widget.items = [];
+        // We have a remote data set.
+        js += '<script type="text/javascript">' +
+          '$("#' + list_id + '").on("filterablecreate", function(event, ui) {' +
+            '_theme_autocomplete_visibility(\'' + autocomplete_id + '\');' +
+          '}).on("filterablebeforefilter", function(e, d) {' +
+            '_theme_autocomplete(this, e, d, "' + autocomplete_id + '"); ' +
+          '});' +
+        '</script>';
       }
-    };
+      else {
+        // Prepare the items then set the data filter reveal attribute.
+        widget.items = _theme_autocomplete_prepare_items(variables);
+        widget.attributes['data-filter-reveal'] = true;
+      }
 
-    // Handle a remote data set.
-    var js = '';
-    if (variables.remote) {
-      widget.items = [];
-      // We have a remote data set.
-      js += '<script type="text/javascript">' +
-        '$("#' + list_id + '").on("filterablebeforefilter", function(e, d) { ' +
-          '_theme_autocomplete(this, e, d, "' + autocomplete_id + '"); ' +
-        '});' +
-      '</script>';
-    }
-    else {
-      // Prepare the items then set the data filter reveal attribute.
-      widget.items = _theme_autocomplete_prepare_items(variables);
-      widget.attributes['data-filter-reveal'] = true;
+      html += theme('item_list', widget);
     }
 
     // Save a reference to the autocomplete text field input.
-    var selector = '#' + drupalgap_get_page_id() +
-      ' #' + id + ' + form.ui-filterable' +
-      ' input[data-type="search"]';
+    var last_item_id = variables.element_id + '-' + variables.langcode + '-' + (variables.cardinality - 1) + '-value';
     js += '<script type="text/javascript">' +
-      '_theme_autocomplete_input_selector["' + autocomplete_id + '"] = \'' +
-        selector +
-      '\';' +
+      '_theme_autocomplete_form_selector["' + id + '"] = ' +
+          '\'#' + drupalgap_get_page_id() + ' #' + last_item_id + ' + form.ui-filterable\';' +
     '</script>';
 
-    // If there was a default value, set it's key title in the autocomplete's
-    // text field.
-    if (variables.default_value_label) {
-      js += drupalgap_jqm_page_event_script_code({
-          page_id: drupalgap_get_page_id(),
-          jqm_page_event: 'pageshow',
-          jqm_page_event_callback:
-            '_theme_autocomplete_set_default_value_label',
-          jqm_page_event_args: JSON.stringify({
-              selector: selector,
-              default_value_label: variables.default_value_label
-          })
-      }, id);
-    }
-
     // Theme the list and add the js to it, then return the html.
-    html += theme('item_list', widget);
     html += js;
     return html;
   }
   catch (error) { console.log('theme_autocomplete - ' + error); }
+}
+
+/**
+ * Hide autocomplete form if we reach the cardinality
+ * @param {String} autocomplete_id The Id of the autocomplete element
+ */
+function _theme_autocomplete_visibility(autocomplete_id) {
+  var id = _theme_autocomplete_variables[autocomplete_id].id;
+  var element_id = _theme_autocomplete_variables[autocomplete_id].element_id;
+  var field_language = _theme_autocomplete_variables[autocomplete_id].langcode;
+  var field_cardinality = _theme_autocomplete_variables[autocomplete_id].cardinality;
+
+  $(_theme_autocomplete_form_selector[id])
+    .hide()
+    .find('input[data-type=search]').val('');
+
+  for (var i = 0; i < field_cardinality; i++) {
+    var field_id = element_id + '-' + field_language + '-' + i + '-value';
+
+    if (empty($('#' + field_id).val())) {
+      $(_theme_autocomplete_form_selector[id])
+        .show();
+      break;
+    }
+  }
+}
+
+/**
+ * Adds a button with one value of the field. When clicked, it will remove the value
+ * @param {String} field_id The id of the hidden input that hold the field value.
+ * @param {String} text Text to show on the button
+ * @return {String} HTML code of the button
+ */
+function _theme_autocomplete_value(field_id, text) {
+  variables = {
+    text: text,
+    attributes: {
+      'data-inline': 'true',
+      'data-icon': 'delete',
+      'data-iconpos': 'right',
+      'data-field_id': field_id,
+      'href': '#',
+      'onclick': '_theme_autocomplete_remove_value(this);'
+    }
+  };
+
+  return theme('button', variables);
+}
+
+/**
+ * Removes a value of a field
+ * @param {Object} button Button object that was clicked
+ */
+function _theme_autocomplete_remove_value(button) {
+  var field_id = $(button).data('field_id');
+
+  // Empty value from field and show autocomplete form
+  $('#' + field_id)
+    .val('');
+
+  $(_theme_autocomplete_form_selector[field_id])
+    .show();
+
+  $(button).remove();
 }
 
 /**
@@ -1720,7 +1784,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
       _theme_autocomplete_success_handlers[autocomplete_id] = function(
         _autocomplete_id, result_items, _wrapped, _child) {
         try {
-
           // If there are no results, and then if an empty callback handler was
           // provided, call it.
           // empty callback handler, then call it and return.
@@ -1731,7 +1794,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
             }
           }
           else {
-
             // Convert the result into an items array for a list. Each item will
             // be a JSON object with a "value" and "label" properties.
             var items = [];
@@ -1795,7 +1857,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
       }
       else { handler = 'views'; }
       switch (handler) {
-
         // Views (and Organic Groups)
         case 'views':
           // Prepare the path to the view.
@@ -1896,7 +1957,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
 
         // The default handler...
         default:
-
           // If we made it this far, and don't have a handler, then warn the
           // developer.
           if (!handler) {
@@ -1905,9 +1965,7 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
           }
 
           break;
-
       }
-
     }
     else {
       // The autocomplete text field was emptied, clear out the hidden value.
@@ -1947,9 +2005,7 @@ function _theme_autocomplete_prepare_items(variables) {
           var options = {
             attributes: {
               value: value,
-              onclick: '_theme_autocomplete_click(\'' +
-                variables.attributes.id +
-              '\', this, \'' + variables.autocomplete_id + '\')'
+              onclick: '_theme_autocomplete_click(this, \'' + variables.autocomplete_id + '\')'
             }
           };
           var _item = l(label, null, options);
@@ -1963,16 +2019,35 @@ function _theme_autocomplete_prepare_items(variables) {
 
 /**
  * An internal function used to handle clicks on items in autocomplete results.
- * @param {String} id The id of the hidden input that holds the value.
  * @param {Object} item The list item anchor that was just clicked.
  * @param {String} autocomplete_id
  */
-function _theme_autocomplete_click(id, item, autocomplete_id) {
+function _theme_autocomplete_click(item, autocomplete_id) {
   try {
+    var variables = _theme_autocomplete_variables[autocomplete_id];
+
     // Set the hidden input with the value, and the text field with the text.
-    var list_id = id + '-list';
-    $('#' + id).val($(item).attr('value'));
-    $(_theme_autocomplete_input_selector[autocomplete_id]).val($(item).html());
+    var list_id = variables.element_id + '-list';
+
+    var field_language = variables.langcode;
+    var field_cardinality = variables.cardinality;
+
+    // Search for an empty position within the field values
+    for (var i = 0; i < field_cardinality; i++) {
+      var field_id = variables.element_id + '-' + field_language + '-' + i + '-value';
+
+      if (empty($('#' + field_id).val())) {
+        $('#' + field_id)
+          .val($(item).attr('value'))
+          .before(
+            _theme_autocomplete_value(field_id, $(item).text())
+          )
+          .prev('[data-role=button]')
+            .buttonMarkup()
+        break;
+      }
+    }
+
     if (_theme_autocomplete_remote[autocomplete_id]) {
       $('#' + list_id).html('');
     }
@@ -1980,6 +2055,9 @@ function _theme_autocomplete_click(id, item, autocomplete_id) {
       $('#' + list_id + ' li').addClass('ui-screen-hidden');
       $('#' + list_id).listview('refresh');
     }
+
+    _theme_autocomplete_visibility(autocomplete_id);
+
     // Now fire the item onclick handler, if one was provided.
     if (
       _theme_autocomplete_variables[autocomplete_id].item_onclick &&
@@ -1994,22 +2072,6 @@ function _theme_autocomplete_click(id, item, autocomplete_id) {
   }
   catch (error) { console.log('_theme_autocomplete_click - ' + error); }
 }
-
-/**
- * Used to set a default value in an autocomplete's text field.
- * @param {Object} options
- */
-function _theme_autocomplete_set_default_value_label(options) {
-  try {
-    setTimeout(function() {
-        $(options.selector).val(options.default_value_label).trigger('create');
-    }, 250);
-  }
-  catch (error) {
-    console.log('_theme_autocomplete_set_default_value_label - ' + error);
-  }
-}
-
 
 /**
  * Given a block delta, this will return the corresponding
@@ -2476,6 +2538,20 @@ function t(str) {
   return str;
 }
 
+/**
+ * Formats a string for HTML display by replacing variable placeholders.
+ *
+ * @param {String} str A string containing placeholders.
+ * @return {String}
+ */
+function format_string(str) {
+  var string = str;
+  for (var i = 1; i <= arguments.length; i++) {
+    var reg = new RegExp("\\{" + i + "\\}", "gm");
+    string = string.replace(reg, arguments[i]);
+  }
+  return string;
+}
 
 /**
  * Given a form element, this will return true if access to the element is
@@ -2636,7 +2712,7 @@ function _drupalgap_form_render_elements(form) {
               var weight =
                 drupalgap.field_info_extra_fields[bundle][name].weight;
               if (content_weighted[weight]) {
-                var msg = 'WARNING: _drupalgap_form_render_elements - the ' + 
+                var msg = 'WARNING: _drupalgap_form_render_elements - the ' +
                 'weight of ' + weight + ' for ' + element.name + ' is ' +
                 'already in use by ' + content_weighted[weight].name;
                 console.log(msg);
@@ -2707,6 +2783,11 @@ function _drupalgap_form_render_element(form, element) {
 
     // Grab the language.
     var language = language_default();
+
+    if (element.und) {
+		  element.und = $.extend(true,element.und,element[language]);
+		  language = 'und'
+		};
 
     // We'll assume the element has no items (e.g. title, nid, vid, etc), unless
     // we determine later that this element is a field, then it'll have items.
@@ -2826,6 +2907,10 @@ function _drupalgap_form_render_element(form, element) {
               delta,
               element
           ]);
+          // hook above may change item.value (see date.js), so put again in variables
+          if (typeof item.value !== 'undefined') {
+            variables.attributes.value = item.value;
+          }
           item = $.extend(true, item, items[delta]);
           // If the item type got lost, replace it.
           if (!item.type && element.type) { item.type = element.type; }
@@ -3112,7 +3197,6 @@ function _drupalgap_form_element_items_widget_arguments(form, form_state,
     console.log('_drupalgap_form_element_items_widget_arguments - ' + error);
   }
 }
-
 
 /**
  * Internal function used to dynamically add another element item to a form for
@@ -3516,6 +3600,8 @@ function _drupalgap_form_load_set_element_defaults(form, language) {
                            // figure out how to handle the 'add another
                            // item' feature.
         }
+        language = 'und'; //language_default();
+
         // Initialize the item collections language code if it hasn't been.
         if (!form.elements[name][language]) {
           form.elements[name][language] = {};
@@ -3685,6 +3771,7 @@ function _drupalgap_form_submit(form_id) {
  */
 function _drupalgap_form_validate(form, form_state) {
   try {
+	  var lng;
     for (var name in form.elements) {
         if (!form.elements.hasOwnProperty(name)) { continue; }
         var element = form.elements[name];
@@ -3692,8 +3779,33 @@ function _drupalgap_form_validate(form, form_state) {
         if (element.required) {
           var valid = true;
           var value = null;
+
+          if (element.und) {
+  		      lng = 'und'
+  		    }
+  	      else {
+  		      lng = language_default();
+  	      }
+
           if (element.is_field) {
-            value = form_state.values[name][language_default()][0];
+            if (
+              (typeof(element['field_info_field']) != 'undefined') &&
+              (typeof(element['field_info_field']['cardinality']) != 'undefined') &&
+              (element['field_info_field']['cardinality'] > 1)
+            ) {
+              value = [];
+
+              for (var index in form_state.values[name][lng]) {
+                if (!form_state.values[name][lng].hasOwnProperty(index)) {
+                  continue;
+                }
+                if (!empty(form_state.values[name][lng][index])) {
+                  value.push(form_state.values[name][lng][index]);
+                }
+              }
+            } else {
+              value = form_state.values[name][lng][0];
+            }
           }
           else { value = form_state.values[name]; }
           // Check for empty values.
@@ -3716,7 +3828,7 @@ function _drupalgap_form_validate(form, form_state) {
             if (element.title) { field_title = element.title; }
             drupalgap_form_set_error(
               name,
-              t('The') + ' ' + field_title + ' ' + t('field is required') + '.'
+              format_string(t('The {1} field is required.'), field_title)
             );
           }
         }
@@ -3734,13 +3846,14 @@ function _drupalgap_form_validate(form, form_state) {
  */
 function drupalgap_form_state_values_assemble(form) {
   try {
-    var lng = language_default();
+    var lng = 'und'; // = language_default();
     var form_state = { values: {} };
     for (var name in form.elements) {
       if (!form.elements.hasOwnProperty(name)) { continue; }
       var element = form.elements[name];
       if (name == 'submit') { continue; } // Always skip the form 'submit'.
       var id = null;
+
       if (element.is_field) {
         form_state.values[name] = {};
         form_state.values[name][lng] = {};
@@ -3890,7 +4003,6 @@ function _drupalgap_form_submit_response_errors(form, form_state, xhr, status,
     console.log('_drupalgap_form_submit_response_errors - ' + error);
   }
 }
-
 
 /**
  * Themes a checkbox input.
@@ -8499,6 +8611,13 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
           if (!function_exists(hook)) { hook = false; }
         }
 
+        if (form.elements[name].und) {
+		        language = 'und'
+		    }
+	      else {
+		      language = language_default();
+	      }
+
         // Retrieve the potential key for the element, if we don't get one
         // then it is a flat field that should be attached as a property to the
         // entity. Otherwise attach the key and value to the entity.
@@ -8524,12 +8643,7 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
           // Or is it only single value fields that don't have it? We need to
           // test this.
           var use_delta = true;
-          if (
-            form.elements[name].type ==
-              'taxonomy_term_reference' ||
-            form.elements[name].field_info_instance.widget.type ==
-              'options_select'
-          ) {
+          if (form.elements[name].field_info_instance.widget.type == 'options_select') {
             use_delta = false;
             entity[name][language] = {};
           }
@@ -8656,6 +8770,11 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
               ) { delete entity[name]; }
 
             }
+          }
+          if (form.elements[name].type == 'taxonomy_term_reference' &&
+              form.elements[name].field_info_instance.widget.type == 'taxonomy_autocomplete' &&
+              typeof(entity[name][language]) != 'undefined') {
+            entity[name][language] = entity[name][language].join(',');
           }
       }
       else if (typeof value !== 'undefined') { entity[name] = value; }
@@ -9161,7 +9280,6 @@ function entity_services_request_pre_postprocess_alter(options, result) {
   }
 }
 
-
 /**
  * Given a field name, this will return its field info.
  * @param {String} field_name
@@ -9302,10 +9420,12 @@ function drupalgap_field_info_instances_add_to_form(entity_type, bundle, form, e
             // Make sure the field has some type of language code on it, or just skip it. An entity will sometimes have
             // a language code that a field doesn't have, so fall back to und on the field if the language code isn't
             // present.
-            if (!entity[name][language]) {
+            /*if (!entity[name][language]) {
               if (!entity[name].und) { continue; }
               language = 'und';
-            }
+            }*/
+            //Drupal sets und in all fields
+            language = 'und';
 
             if (!form.elements[name][language]) { form.elements[name][language] = {}; }
 
@@ -9315,17 +9435,24 @@ function drupalgap_field_info_instances_add_to_form(entity_type, bundle, form, e
               // value_callback property present in Drupal's FAPI? That way
               // each element knows how to map the entity data to its element
               // value property.
-              if (
-                entity[name][language][delta] &&
-                typeof entity[name][language][delta].value !== 'undefined'
-              ) { default_value = entity[name][language][delta].value; }
+              if (entity[name][language][delta] && typeof entity[name][language][delta].value !== 'undefined') {
+                  default_value = entity[name][language][delta].value;
+              }
+              else {
+                if (form.elements[name].type == 'taxonomy_term_reference' && typeof entity[name][language][delta] != 'undefined' && typeof entity[name][language][delta].tid != 'undefined') {
+                  default_value = entity[name][language][delta].tid;
+                }
+              }
 
               // If the default_value is null, set it to an empty string.
-              if (default_value == null) { default_value = ''; }
+              if (default_value == null) {
+                default_value = '';
+              }
 
               // Note, not all fields have a language code to use here, e.g. taxonomy term reference fields do not.
               form.elements[name][language][delta] = {
-                value: default_value
+                value: default_value,
+                default_value: default_value
               };
 
               // Place the field item onto the element.
@@ -9794,7 +9921,10 @@ function options_field_widget_form(form, form_state, field, instance, langcode, 
               '_theme_taxonomy_term_reference_load_items',
             'jqm_page_event_args': JSON.stringify({
                 'taxonomy_vocabulary': taxonomy_vocabulary,
-                'widget_id': widget_id
+                'widget_id': widget_id,
+                'element_id': element.id,
+                'required': items[delta].required,
+                'default_value': items[delta].default_value
             })
           };
           // Pass the field name so the page event handler can be called for
@@ -9886,7 +10016,6 @@ function text_field_widget_form(form, form_state, field, instance, langcode, ite
   }
   catch (error) { console.log('text_field_widget_form - ' + error); }
 }
-
 
 /**
  * Implements hook_field_formatter_view().
@@ -12508,6 +12637,11 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
     if (typeof items[language_default()] !== 'undefined') {
       items = items[language_default()];
     }
+    else {
+      if (typeof items['und'] !== 'undefined') {
+        items = items['und'];
+      }
+    }
     if (!empty(items)) {
       for (var delta in items) {
           if (!items.hasOwnProperty(delta)) { continue; }
@@ -12549,42 +12683,99 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
  * @param {Number} delta
  * @param {Object} element
  */
-function taxonomy_field_widget_form(form, form_state, field, instance, langcode,
-  items, delta, element) {
-  try {
-    items[delta].type = 'hidden';
-    // Build the widget and attach it to the item.
-    var list_id = items[delta].id + '-list';
-    var widget = {
-      theme: 'item_list',
-      items: [],
-      attributes: {
-        'id': list_id,
-        'data-role': 'listview',
-        'data-filter': 'true',
-        'data-inset': 'true',
-        'data-filter-placeholder': '...'
-      }
-    };
-    items[delta].children.push(widget);
-    // Attach JS to handle the widget's data fetching.
-    var machine_name = field.settings.allowed_values[0].vocabulary;
-    var vocabulary = taxonomy_vocabulary_machine_name_load(machine_name);
-    var vid = vocabulary.vid;
-    var js = '<script type="text/javascript">' +
-      '$("#' + list_id + '").on("filterablebeforefilter",' +
-        'function(e, d) {' +
-          '_taxonomy_field_widget_form_autocomplete(' +
-            '"' + items[delta].id + '", ' + vid + ', this, e, d' +
-          ');' +
-        '}' +
-      ');' +
-    '</script>';
-    items[delta].children.push({
-        markup: js
-    });
-  }
-  catch (error) { console.log('taxonomy_field_widget_form - ' + error); }
+ function taxonomy_field_widget_form(form, form_state, field, instance, langcode,
+   items, delta, element) {
+   try {
+     items[delta].type = 'hidden';
+
+     items[delta].value = '';
+     if (typeof(element[langcode][delta].item) != 'undefined') {
+       items[delta].value = element[langcode][delta].item.name;
+
+       items[delta].children.push({
+         markup: '<script type="text/javascript"> _taxonomy_field_widget_form_add_value(\'' + items[delta].id + '\', \'' + items[delta].value + '\'); </script>'
+       });
+     }
+
+     if ((parseInt(delta) + 1) == field.cardinality) {
+       // Build the widget and attach it to the item.
+       var list_id = element.id + '-list';
+       var widget = {
+         theme: 'item_list',
+         items: [],
+         attributes: {
+           'id': list_id,
+           'data-role': 'listview',
+           'data-filter': 'true',
+           'data-inset': 'true',
+           'data-filter-placeholder': '',
+           'data-field_language': langcode,
+           'data-field_cardinality': element['field_info_field']['cardinality']
+         }
+       };
+       items[delta].children.push(widget);
+       // Attach JS to handle the widget's data fetching.
+       var machine_name = field.settings.allowed_values[0].vocabulary;
+       var vocabulary = taxonomy_vocabulary_machine_name_load(machine_name);
+       var vid = vocabulary.vid;
+  
+       var js = '<script type="text/javascript">' +
+         '$("#' + list_id + '").on("filterablecreate", function(event, ui) {' +
+           '_taxonomy_field_widget_form_visibility(' +
+             '"' + element.id + '", "' + langcode + '", ' + element['field_info_field']['cardinality'] +
+           ');' +
+         '}).on("filterablebeforefilter", function(event, ui) {' +
+             '_taxonomy_field_widget_form_autocomplete(' +
+               '"' + element.id + '", ' + vid + ', this, event, ui' +
+             ');' +
+           '}' +
+         '); ' +
+       '</script>';
+       items[delta].children.push({
+         markup: js
+       });
+     }
+   }
+   catch (error) { console.log('taxonomy_field_widget_form - ' + error); }
+ }
+
+/**
+ * Adds a button with one value of the field. When clicked, it will remove the value
+ * @param {String} field_id The id of the hidden input that hold the term id.
+ * @param {String} text Text to show on the button
+ */
+function _taxonomy_field_widget_form_add_value(field_id, text) {
+  variables = {
+    text: text,
+    attributes: {
+      'data-inline': 'true',
+      'data-icon': 'delete',
+      'data-iconpos': 'right',
+      'data-field_id': field_id,
+      'href': '#',
+      'onclick': '_taxonomy_field_autocomplete_remove_value(this);'
+    }
+  };
+
+  $('#' + field_id).after(
+    theme('button', variables)
+  );
+}
+
+/**
+ * Removes a value of a field
+ * @param {Object} button Button object that was clicked
+ */
+function _taxonomy_field_autocomplete_remove_value(button) {
+  var field_id = $(button).data('field_id');
+
+  // Empty value from field and show autocomplete form
+  $('#' + field_id)
+    .val('')
+    .siblings('form')
+      .show();
+
+  $(button).remove();
 }
 
 var _taxonomy_field_widget_form_autocomplete_input = null;
@@ -12616,6 +12807,19 @@ function _taxonomy_field_widget_form_autocomplete(id, vid, list, e, data) {
     // Clear the list, then set up its input handlers.
     $ul.html('');
     if (value && value.length > 0) {
+        // Add typed value to the options
+        var attributes = {
+          tid: 0,
+          vid: vid,
+          name: value,
+          onclick: '_taxonomy_field_widget_form_click(' +
+            "'" + id + "', " +
+            "'" + $ul.attr('id') + "', " +
+            'this' +
+          ')'
+        };
+        html += '<li ' + drupalgap_attributes(attributes) + '>' + value + '</li>';
+
         $ul.html('<li><div class="ui-loader">' +
           '<span class="ui-icon ui-icon-loading"></span>' +
           '</div></li>');
@@ -12634,28 +12838,33 @@ function _taxonomy_field_widget_form_autocomplete(id, vid, list, e, data) {
             success: function(terms) {
               if (terms.length != 0) {
                 // Extract the terms into items, then drop them in the list.
-                var items = [];
+                var items = [value.toLowerCase()];
                 for (var index in terms) {
                     if (!terms.hasOwnProperty(index)) { continue; }
                     var term = terms[index];
-                    var attributes = {
-                      tid: term.tid,
-                      vid: vid,
-                      name: term.name,
-                      onclick: '_taxonomy_field_widget_form_click(' +
-                        "'" + id + "', " +
-                        "'" + $ul.attr('id') + "', " +
-                        'this' +
-                      ')'
-                    };
-                    html += '<li ' + drupalgap_attributes(attributes) + '>' +
-                      term.name +
-                    '</li>';
+                    // Only add a value if it's not added before
+                    if ($.inArray(term.name.toLowerCase(), items) < 0) {
+                        items.push(term.name.toLowerCase());
+
+                        var attributes = {
+                          tid: term.tid,
+                          vid: vid,
+                          name: term.name,
+                          onclick: '_taxonomy_field_widget_form_click(' +
+                            "'" + id + "', " +
+                            "'" + $ul.attr('id') + "', " +
+                            'this' +
+                          ')'
+                        };
+                        html += '<li ' + drupalgap_attributes(attributes) + '>' +
+                          term.name +
+                        '</li>';
+                    }
                 }
-                $ul.html(html);
-                $ul.listview('refresh');
-                $ul.trigger('updatelayout');
               }
+              $ul.html(html);
+              $ul.listview('refresh');
+              $ul.trigger('updatelayout');
             }
         });
     }
@@ -12667,18 +12876,59 @@ function _taxonomy_field_widget_form_autocomplete(id, vid, list, e, data) {
 
 /**
  * Handles clicks on taxonomy term reference autocomplete widgets.
- * @param {String} id The id of the hidden input that will hold the term name.
+ * @param {String} id The id of the element
  * @param {String} list_id The id of the list that holds the terms.
  * @param {Object} item The list item that was just clicked.
  */
 function _taxonomy_field_widget_form_click(id, list_id, item) {
   try {
     var tid = $(item).attr('name');
-    $('#' + id).val(tid);
-    $(_taxonomy_field_widget_form_autocomplete_input).val($(item).attr('name'));
+    var field_language = $('#' + list_id).data('field_language');
+    var field_cardinality = $('#' + list_id).data('field_cardinality');
+
+    // Search for an empty position within the field values
+    for (var i = 0; i < field_cardinality; i++) {
+      var field_id = id + '-' + field_language + '-' + i + '-value';
+
+      if (empty($('#' + field_id).val())) {
+        _taxonomy_field_widget_form_add_value(field_id, tid);
+        $('#' + field_id)
+          .val(tid)
+          .next('[data-role=button]')
+            .buttonMarkup()
+        break;
+      }
+    }
+
+    $(_taxonomy_field_widget_form_autocomplete_input).val('');
     $('#' + list_id).html('');
+
+    _taxonomy_field_widget_form_visibility(id, field_language, field_cardinality);
   }
   catch (error) { console.log('_taxonomy_field_widget_form_click - ' + error); }
+}
+
+/**
+ * Hide autocomplete form if we reach the cardinality
+ * @param {String} id The Id of the element
+ * @param {String} field_language The language of the field
+ * @param {Number} field_cardinality The cardinality of the field
+ */
+function _taxonomy_field_widget_form_visibility(id, field_language, field_cardinality) {
+  $('#' + id + '-' + field_language + '-0-value')
+    .siblings('form')
+      .hide();
+
+  for (var i = 0; i < field_cardinality; i++) {
+    var field_id = id + '-' + field_language + '-' + i + '-value';
+
+    if (empty($('#' + field_id).val())) {
+      $('#' + field_id)
+        .siblings('form')
+          .show();
+      break;
+    }
+  }
 }
 
 /**
@@ -12700,6 +12950,8 @@ function taxonomy_assemble_form_state_into_field(entity_type, bundle,
     switch (instance.widget.type) {
       case 'taxonomy_autocomplete':
         field_key.use_wrapper = false;
+        field_key.use_delta = true;
+        field_key.use_key = false;
         result = form_state_value;
         break;
       case 'options_select':
@@ -13296,11 +13548,12 @@ function _theme_taxonomy_term_reference_load_items(options) {
               _taxonomy_term_reference_terms[options.element_id]['All'] =
                 '- Any -';
             }
-            else {
+            //Already implemented in options_field_widget_form()
+            /*else {
               option = '<option value="">- ' + t('None') + ' -</option>';
               _taxonomy_term_reference_terms[options.element_id][''] =
                 '- None -';
-            }
+            }*/
             $(widget).append(option);
           }
 
@@ -13309,14 +13562,13 @@ function _theme_taxonomy_term_reference_load_items(options) {
           for (var index in terms) {
               if (!terms.hasOwnProperty(index)) { continue; }
               var term = terms[index];
-              var option = '<option value="' + term.tid + '">' +
-                term.name +
-              '</option>';
+              var option = '<option value="' + term.tid + '">' + term.name + '</option>';
               $(widget).append(option);
-              _taxonomy_term_reference_terms[options.element_id][term.tid] =
-                term.name;
+              _taxonomy_term_reference_terms[options.element_id][term.tid] = term.name;
           }
 
+          //Sets the default value
+          $(widget).val(options.default_value);
           // Refresh the select list.
           $(widget).selectmenu('refresh', true);
         }
@@ -13689,7 +13941,16 @@ function user_profile_form(form, form_state, account) {
     // Add password fields to the form. We show the current password field only
     // if the user is editing their account. We show the password and confirm
     // password field no matter what.
-    if (Drupal.user.uid == account.uid) {
+
+    // Checks whether the user has requested a password reset to hide the current_pass field
+    var pass_reset = false;
+    if (typeof (localStorage) != 'undefined') {
+      if (localStorage.getItem('pass-reset-token')) {
+        pass_reset = true;
+      }
+    }
+
+    if (Drupal.user.uid == account.uid && !pass_reset) {
       form.elements.current_pass = {
         'title': t('Current password'),
         'type': 'password',
@@ -13736,6 +13997,7 @@ function user_profile_form_validate(form, form_state) {
   try {
     // If they entered their current password, and entered new passwords, make
     // sure the new passwords match.
+
     if (!empty(form_state.values['current_pass'])) {
       if (
         !empty(form_state.values['pass_pass1']) &&
@@ -13752,10 +14014,21 @@ function user_profile_form_validate(form, form_state) {
       !empty(form_state.values['pass_pass1']) &&
       !empty(form_state.values['pass_pass2'])
     ) {
-      drupalgap_form_set_error(
-        'current_pass',
-        t('You must enter your current password to change your password.')
-      );
+      // Checks whether the user has requested a password reset to bypass the current_pass empty value
+      if (
+        typeof(localStorage) != 'undefined' &&
+        localStorage.getItem('pass-reset-token')
+      ) {
+        if (form_state.values['pass_pass1'] != form_state.values['pass_pass2']) {
+          drupalgap_form_set_error('pass_pass1', t('Passwords do not match.'));
+        }
+      }
+      else {
+        drupalgap_form_set_error(
+          'current_pass',
+          t('You must enter your current password to change your password.')
+        );
+      }
     }
   }
   catch (error) { console.log('user_profile_form_validate - ' + error); }
@@ -13769,10 +14042,19 @@ function user_profile_form_validate(form, form_state) {
 function user_profile_form_submit(form, form_state) {
   try {
     var account = drupalgap_entity_build_from_form_state(form, form_state);
-    // If they provided their current password, and their new password, prepare
+    // If they provided their current password or if it's a password reset, and their new password, prepare
     // the account submission values.
+
+    //Checks whether the user has requested a password reset
+    var pass_reset = false;
+    if (typeof (localStorage) != 'undefined') {
+      if (localStorage.getItem('pass-reset-token')) {
+        pass_reset = true;
+      }
+    }
+
     if (
-      account.current_pass &&
+      (account.current_pass || pass_reset) &&
       !empty(account.pass_pass1) &&
       !empty(account.pass_pass2)
     ) {
@@ -13784,6 +14066,26 @@ function user_profile_form_submit(form, form_state) {
   }
   catch (error) { console.log('user_profile_form_submit - ' + error); }
 }
+
+
+function user_services_preprocess(options) {
+  if (
+    typeof(options.service) != 'undefined' &&
+    options.service == 'user' &&
+    typeof(options.resource) != 'undefined' &&
+    options.resource == 'update'
+  ) {
+    if (typeof (localStorage) != 'undefined') {
+      var pass_reset_token = localStorage.getItem('pass-reset-token');
+      if (pass_reset_token) {
+        options.path += '&pass-reset-token=' + pass_reset_token;
+        localStorage.removeItem('pass-reset-token');
+      }
+    }
+  }
+}
+
+
 
 /**
  * The request new password form.
@@ -13835,7 +14137,6 @@ function user_pass_form_submit(form, form_state) {
   }
   catch (error) { console.log('user_pass_form_submit - ' + error); }
 }
-
 
 /**
  * Determine whether the user has a given privilege. Optionally pass in a user
@@ -14041,6 +14342,50 @@ function user_register_access() {
   catch (error) { console.log('user_register_access - ' + error); }
 }
 
+
+/*
+* Gets y sets in localStorage the user pass reset token
+*/
+function user_pass_reset(user_id, timestamp, hash, options) {
+  var data = {
+    'uid': user_id,
+    'timestamp': timestamp,
+    'hashed_pass': hash
+  };
+  // Send data to drupal service
+  Drupal.services.call({
+    method: 'POST',
+    path: 'user/user_pass_reset.json',
+    data: JSON.stringify(data),
+    success: function (result) {
+      if (typeof (result.pass_reset_token) != 'undefined') {
+        var pass_reset_token = result.pass_reset_token;
+        localStorage.setItem('pass-reset-token', pass_reset_token);
+        user_load(user_id, {
+          success: function(user) {
+            Drupal.user = user;
+            Drupal.sessid = null;
+            services_get_csrf_token({
+              success: function (token) {
+                drupalgap_set_message(t('You have just used your one-time login link. It is no longer necessary to use this link to log in. Please change your password.'));
+                drupalgap_goto('user/' + Drupal.user.uid + '/edit');
+              },
+              error: function (error) {
+              },
+              reset: true
+            });
+          }
+        });
+      }
+    },
+    error: function(error) {
+      if (error.status == '406') {
+        drupalgap_alert(t('You have tried to use a one-time login link that has either been used or is no longer valid. Please request a new one.'));
+      }
+    }
+  });
+}
+
 /**
  * Implements hook_services_postprocess().
  * @param {Object} options
@@ -14201,7 +14546,6 @@ function drupalgap_user_has_role(role) {
   }
   catch (error) { console.log('drupalgap_user_has_role - ' + error); }
 }
-
 
 // Holds onto views contexts on a per page basis.
 var _views_embedded_views = {};
