@@ -100,14 +100,9 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
    try {
      items[delta].type = 'hidden';
 
-     var lng = language_default();
-     if (typeof(element[lng]) == 'undefined') {
-       lng = 'und';
-     }
-
      items[delta].value = '';
-     if (typeof(element[lng][delta].item) != 'undefined') {
-       items[delta].value = element[lng][delta].item.name;
+     if (typeof(element[langcode][delta].item) != 'undefined') {
+       items[delta].value = element[langcode][delta].item.name;
 
        items[delta].children.push({
          markup: '<script type="text/javascript"> _taxonomy_field_widget_form_add_value(\'' + items[delta].id + '\', \'' + items[delta].value + '\'); </script>'
@@ -126,7 +121,7 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
            'data-filter': 'true',
            'data-inset': 'true',
            'data-filter-placeholder': '',
-           'data-field_language': lng,
+           'data-field_language': langcode,
            'data-field_cardinality': element['field_info_field']['cardinality']
          }
        };
@@ -139,7 +134,7 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
        var js = '<script type="text/javascript">' +
          '$("#' + list_id + '").on("filterablecreate", function(event, ui) {' +
            '_taxonomy_field_widget_form_visibility(' +
-             '"' + element.id + '", "' + lng + '", ' + element['field_info_field']['cardinality'] +
+             '"' + element.id + '", "' + langcode + '", ' + element['field_info_field']['cardinality'] +
            ');' +
          '}).on("filterablebeforefilter", function(event, ui) {' +
              '_taxonomy_field_widget_form_autocomplete(' +
