@@ -2,8 +2,8 @@
  * Autocomplete global variables. Used to hold onto various global variables
  * needed for an autocomplete.
  */
-// The autocomplete text field input selector.
-var _theme_autocomplete_input_selector = {};
+// The autocomplete form selector.
+var _theme_autocomplete_form_selector = {};
 
 // The autocomplete remote boolean.
 var _theme_autocomplete_remote = {};
@@ -22,6 +22,7 @@ var _theme_autocomplete_success_handlers = {};
 function theme_autocomplete(variables) {
   try {
     var html = '';
+    var js = '';
 
     // We need to have a unique identifier for this autocomplete. If it is a
     // field, use the field name. Otherwise use the id attribute if it is
@@ -61,71 +62,134 @@ function theme_autocomplete(variables) {
     if (
       variables.element &&
       typeof variables.element.default_value !== 'undefined'
-    ) { hidden_attributes.value = variables.element.default_value; }
+    ) {
+      hidden_attributes.value = variables.element.default_value;
+
+      if (!empty(variables.element.default_value)) {
+        label_value = variables.element.default_value;
+        if (
+          (typeof(variables.element.default_value_label) != 'undefined') &&
+          (!empty(variables.element.default_value_label))
+        ) {
+          label_value = variables.element.default_value_label;
+        }
+        html += _theme_autocomplete_value(id, label_value);
+      }
+    }
     html += theme('hidden', { attributes: hidden_attributes });
 
-    // Now we need an id for the list.
-    var list_id = id + '-list';
+    if ((parseInt(variables.delta) + 1) == variables.cardinality) {
+      // Now we need an id for the list.
+      var list_id = variables.element_id + '-list';
 
-    // Build the widget variables.
-    var widget = {
-      attributes: {
-        'id': list_id,
-        'data-role': 'listview',
-        'data-filter': 'true',
-        'data-inset': 'true',
-        'data-filter-placeholder': '...'
+      // Build the widget variables.
+      var widget = {
+        attributes: {
+          'id': list_id,
+          'data-role': 'listview',
+          'data-filter': 'true',
+          'data-inset': 'true',
+          'data-filter-placeholder': '...'
+        }
+      };
+
+      // Handle a remote data set.
+      if (variables.remote) {
+        widget.items = [];
+        // We have a remote data set.
+        js += '<script type="text/javascript">' +
+          '$("#' + list_id + '").on("filterablecreate", function(event, ui) {' +
+            '_theme_autocomplete_visibility(\'' + autocomplete_id + '\');' +
+          '}).on("filterablebeforefilter", function(e, d) {' +
+            '_theme_autocomplete(this, e, d, "' + autocomplete_id + '"); ' +
+          '});' +
+        '</script>';
       }
-    };
+      else {
+        // Prepare the items then set the data filter reveal attribute.
+        widget.items = _theme_autocomplete_prepare_items(variables);
+        widget.attributes['data-filter-reveal'] = true;
+      }
 
-    // Handle a remote data set.
-    var js = '';
-    if (variables.remote) {
-      widget.items = [];
-      // We have a remote data set.
-      js += '<script type="text/javascript">' +
-        '$("#' + list_id + '").on("filterablebeforefilter", function(e, d) { ' +
-          '_theme_autocomplete(this, e, d, "' + autocomplete_id + '"); ' +
-        '});' +
-      '</script>';
-    }
-    else {
-      // Prepare the items then set the data filter reveal attribute.
-      widget.items = _theme_autocomplete_prepare_items(variables);
-      widget.attributes['data-filter-reveal'] = true;
+      html += theme('item_list', widget);
     }
 
     // Save a reference to the autocomplete text field input.
-    var selector = '#' + drupalgap_get_page_id() +
-      ' #' + id + ' + form.ui-filterable' +
-      ' input[data-type="search"]';
+    var last_item_id = variables.element_id + '-' + variables.langcode + '-' + (variables.cardinality - 1) + '-value';
     js += '<script type="text/javascript">' +
-      '_theme_autocomplete_input_selector["' + autocomplete_id + '"] = \'' +
-        selector +
-      '\';' +
+      '_theme_autocomplete_form_selector["' + id + '"] = ' +
+          '\'#' + drupalgap_get_page_id() + ' #' + last_item_id + ' + form.ui-filterable\';' +
     '</script>';
 
-    // If there was a default value, set it's key title in the autocomplete's
-    // text field.
-    if (variables.default_value_label) {
-      js += drupalgap_jqm_page_event_script_code({
-          page_id: drupalgap_get_page_id(),
-          jqm_page_event: 'pageshow',
-          jqm_page_event_callback:
-            '_theme_autocomplete_set_default_value_label',
-          jqm_page_event_args: JSON.stringify({
-              selector: selector,
-              default_value_label: variables.default_value_label
-          })
-      }, id);
-    }
-
     // Theme the list and add the js to it, then return the html.
-    html += theme('item_list', widget);
     html += js;
     return html;
   }
   catch (error) { console.log('theme_autocomplete - ' + error); }
+}
+
+/**
+ * Hide autocomplete form if we reach the cardinality
+ * @param {String} autocomplete_id The Id of the autocomplete element
+ */
+function _theme_autocomplete_visibility(autocomplete_id) {
+  var id = _theme_autocomplete_variables[autocomplete_id].id;
+  var element_id = _theme_autocomplete_variables[autocomplete_id].element_id;
+  var field_language = _theme_autocomplete_variables[autocomplete_id].langcode;
+  var field_cardinality = _theme_autocomplete_variables[autocomplete_id].cardinality;
+
+  $(_theme_autocomplete_form_selector[id])
+    .hide()
+    .find('input[data-type=search]').val('');
+
+  for (var i = 0; i < field_cardinality; i++) {
+    var field_id = element_id + '-' + field_language + '-' + i + '-value';
+
+    if (empty($('#' + field_id).val())) {
+      $(_theme_autocomplete_form_selector[id])
+        .show();
+      break;
+    }
+  }
+}
+
+/**
+ * Adds a button with one value of the field. When clicked, it will remove the value
+ * @param {String} field_id The id of the hidden input that hold the field value.
+ * @param {String} text Text to show on the button
+ * @return {String} HTML code of the button
+ */
+function _theme_autocomplete_value(field_id, text) {
+  variables = {
+    text: text,
+    attributes: {
+      'data-inline': 'true',
+      'data-icon': 'delete',
+      'data-iconpos': 'right',
+      'data-field_id': field_id,
+      'href': '#',
+      'onclick': '_theme_autocomplete_remove_value(this);'
+    }
+  };
+
+  return theme('button', variables);
+}
+
+/**
+ * Removes a value of a field
+ * @param {Object} button Button object that was clicked
+ */
+function _theme_autocomplete_remove_value(button) {
+  var field_id = $(button).data('field_id');
+
+  // Empty value from field and show autocomplete form
+  $('#' + field_id)
+    .val('');
+
+  $(_theme_autocomplete_form_selector[field_id])
+    .show();
+
+  $(button).remove();
 }
 
 /**
@@ -182,7 +246,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
       _theme_autocomplete_success_handlers[autocomplete_id] = function(
         _autocomplete_id, result_items, _wrapped, _child) {
         try {
-
           // If there are no results, and then if an empty callback handler was
           // provided, call it.
           // empty callback handler, then call it and return.
@@ -193,7 +256,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
             }
           }
           else {
-
             // Convert the result into an items array for a list. Each item will
             // be a JSON object with a "value" and "label" properties.
             var items = [];
@@ -257,7 +319,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
       }
       else { handler = 'views'; }
       switch (handler) {
-
         // Views (and Organic Groups)
         case 'views':
           // Prepare the path to the view.
@@ -358,7 +419,6 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
 
         // The default handler...
         default:
-
           // If we made it this far, and don't have a handler, then warn the
           // developer.
           if (!handler) {
@@ -367,9 +427,7 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
           }
 
           break;
-
       }
-
     }
     else {
       // The autocomplete text field was emptied, clear out the hidden value.
@@ -409,9 +467,7 @@ function _theme_autocomplete_prepare_items(variables) {
           var options = {
             attributes: {
               value: value,
-              onclick: '_theme_autocomplete_click(\'' +
-                variables.attributes.id +
-              '\', this, \'' + variables.autocomplete_id + '\')'
+              onclick: '_theme_autocomplete_click(this, \'' + variables.autocomplete_id + '\')'
             }
           };
           var _item = l(label, null, options);
@@ -425,16 +481,35 @@ function _theme_autocomplete_prepare_items(variables) {
 
 /**
  * An internal function used to handle clicks on items in autocomplete results.
- * @param {String} id The id of the hidden input that holds the value.
  * @param {Object} item The list item anchor that was just clicked.
  * @param {String} autocomplete_id
  */
-function _theme_autocomplete_click(id, item, autocomplete_id) {
+function _theme_autocomplete_click(item, autocomplete_id) {
   try {
+    var variables = _theme_autocomplete_variables[autocomplete_id];
+
     // Set the hidden input with the value, and the text field with the text.
-    var list_id = id + '-list';
-    $('#' + id).val($(item).attr('value'));
-    $(_theme_autocomplete_input_selector[autocomplete_id]).val($(item).html());
+    var list_id = variables.element_id + '-list';
+
+    var field_language = variables.langcode;
+    var field_cardinality = variables.cardinality;
+
+    // Search for an empty position within the field values
+    for (var i = 0; i < field_cardinality; i++) {
+      var field_id = variables.element_id + '-' + field_language + '-' + i + '-value';
+
+      if (empty($('#' + field_id).val())) {
+        $('#' + field_id)
+          .val($(item).attr('value'))
+          .before(
+            _theme_autocomplete_value(field_id, $(item).text())
+          )
+          .prev('[data-role=button]')
+            .buttonMarkup()
+        break;
+      }
+    }
+
     if (_theme_autocomplete_remote[autocomplete_id]) {
       $('#' + list_id).html('');
     }
@@ -442,6 +517,9 @@ function _theme_autocomplete_click(id, item, autocomplete_id) {
       $('#' + list_id + ' li').addClass('ui-screen-hidden');
       $('#' + list_id).listview('refresh');
     }
+
+    _theme_autocomplete_visibility(autocomplete_id);
+
     // Now fire the item onclick handler, if one was provided.
     if (
       _theme_autocomplete_variables[autocomplete_id].item_onclick &&
@@ -456,19 +534,3 @@ function _theme_autocomplete_click(id, item, autocomplete_id) {
   }
   catch (error) { console.log('_theme_autocomplete_click - ' + error); }
 }
-
-/**
- * Used to set a default value in an autocomplete's text field.
- * @param {Object} options
- */
-function _theme_autocomplete_set_default_value_label(options) {
-  try {
-    setTimeout(function() {
-        $(options.selector).val(options.default_value_label).trigger('create');
-    }, 250);
-  }
-  catch (error) {
-    console.log('_theme_autocomplete_set_default_value_label - ' + error);
-  }
-}
-
