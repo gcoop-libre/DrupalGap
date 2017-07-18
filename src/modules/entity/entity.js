@@ -554,6 +554,11 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
               typeof(entity[name][language]) != 'undefined') {
             entity[name][language] = entity[name][language].join(',');
           }
+          if (form.elements[name].type == 'entityreference' &&
+              form.elements[name].field_info_instance.widget.type == 'entityreference_autocomplete_tags' &&
+              typeof(entity[name][language]) != 'undefined') {
+            entity[name][language] = entity[name][language].join(',');
+          }
       }
       else if (typeof value !== 'undefined') { entity[name] = value; }
     }
