@@ -98,248 +98,61 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
  function taxonomy_field_widget_form(form, form_state, field, instance, langcode,
    items, delta, element) {
    try {
-     items[delta].type = 'hidden';
-
-     items[delta].value = '';
-     if (typeof(element[langcode][delta].item) != 'undefined') {
-       items[delta].value = element[langcode][delta].item.name;
-
-       items[delta].children.push({
-         markup: '<script type="text/javascript"> _taxonomy_field_widget_form_add_value(\'' + items[delta].id + '\', \'' + items[delta].value + '\'); </script>'
-       });
+     var key_title = entity_primary_key_title('taxonomy_term');
+     items[delta].type = 'autocomplete';
+     items[delta].delta = delta;
+     items[delta].element_id = element.id;
+     items[delta].cardinality = field.cardinality;
+     items[delta].langcode = langcode;
+     items[delta].remote = true;
+     items[delta].custom = true;
+     items[delta].handler = 'index';
+     items[delta].entity_type = 'taxonomy_term';
+     items[delta].value = entity_primary_key('taxonomy_term');
+     items[delta].label = key_title;
+     items[delta].filter = key_title;
+     if (typeof(field.settings.allowed_values[0].vocabulary) != 'undefined') {
+       items[delta].vid = taxonomy_vocabulary_get_vid_from_name(field.settings.allowed_values[0].vocabulary);
      }
+     items[delta].finish_callback = 'taxonomy_field_widget_form_finish_callback';
 
-     if ((parseInt(delta) + 1) == field.cardinality) {
-       // Build the widget and attach it to the item.
-       var list_id = element.id + '-list';
-       var widget = {
-         theme: 'item_list',
-         items: [],
-         attributes: {
-           'id': list_id,
-           'data-role': 'listview',
-           'data-filter': 'true',
-           'data-inset': 'true',
-           'data-filter-placeholder': '',
-           'data-field_language': langcode,
-           'data-field_cardinality': element['field_info_field']['cardinality']
-         }
-       };
-       items[delta].children.push(widget);
-       // Attach JS to handle the widget's data fetching.
-       var machine_name = field.settings.allowed_values[0].vocabulary;
-       var vocabulary = taxonomy_vocabulary_machine_name_load(machine_name);
-       var vid = vocabulary.vid;
-  
-       var js = '<script type="text/javascript">' +
-         '$("#' + list_id + '").on("filterablecreate", function(event, ui) {' +
-           '_taxonomy_field_widget_form_visibility(' +
-             '"' + element.id + '", "' + langcode + '", ' + element['field_info_field']['cardinality'] +
-           ');' +
-         '}).on("filterablebeforefilter", function(event, ui) {' +
-             '_taxonomy_field_widget_form_autocomplete(' +
-               '"' + element.id + '", ' + vid + ', this, event, ui' +
-             ');' +
-           '}' +
-         '); ' +
-       '</script>';
-       items[delta].children.push({
-         markup: js
-       });
+     // Set any existing item values.
+     items[delta].default_value = '';
+     items[delta].default_value_label = '';
+     if (items[delta].item && items[delta].item.tid) {
+       items[delta].default_value = items[delta].item[key_title];
+       items[delta].default_value_label = items[delta].item[key_title];
      }
    }
    catch (error) { console.log('taxonomy_field_widget_form - ' + error); }
- }
-
-/**
- * Adds a button with one value of the field. When clicked, it will remove the value
- * @param {String} field_id The id of the hidden input that hold the term id.
- * @param {String} text Text to show on the button
- */
-function _taxonomy_field_widget_form_add_value(field_id, text) {
-  variables = {
-    text: text,
-    attributes: {
-      'data-inline': 'true',
-      'data-icon': 'delete',
-      'data-iconpos': 'right',
-      'data-field_id': field_id,
-      'href': '#',
-      'onclick': '_taxonomy_field_autocomplete_remove_value(this);'
-    }
-  };
-
-  $('#' + field_id).after(
-    theme('button', variables)
-  );
 }
 
 /**
- * Removes a value of a field
- * @param {Object} button Button object that was clicked
+ * Implements the callback after on the completion of the autocomplete
+ *   This should add the typed value if it is not one of the returned items
+ * @param {String} value
+ * @param {Object} list
+ * @param {String} autocomplete_id
  */
-function _taxonomy_field_autocomplete_remove_value(button) {
-  var field_id = $(button).data('field_id');
+function taxonomy_field_widget_form_finish_callback(value, list, autocomplete_id) {
+  var $ul = $(list);
+  var items = [];
 
-  // Empty value from field and show autocomplete form
-  $('#' + field_id)
-    .val('')
-    .siblings('form')
-      .show();
+  $ul.find('a').each(function() {
+    items.push($(this).attr('value').toLowerCase());
+  });
 
-  $(button).remove();
-}
-
-var _taxonomy_field_widget_form_autocomplete_input = null;
-
-/**
- * Handles the remote data fetching for taxonomy term reference autocomplete
- * tagging widget.
- * @param {String} id The id of the hidden input that will hold the term id.
- * @param {Number} vid
- * @param {Object} list The unordered list that displays the terms.
- * @param {Object} e
- * @param {Object} data
- */
-function _taxonomy_field_widget_form_autocomplete(id, vid, list, e, data) {
-  try {
-    // Setup the vars to handle this widget.
-    var $ul = $(list),
-        $input = $(data.input),
-        value = $input.val(),
-        html = '';
-    // Save a reference to this text input field. Then attach an on change
-    // handler that will set the hidden input's value when the text field
-    // changes. Keep in mind, later on we listen for clicks on autocomplete
-    // results to populate this same hidden input's field.
-    _taxonomy_field_widget_form_autocomplete_input = $input;
-    $(_taxonomy_field_widget_form_autocomplete_input).on('change', function() {
-        $('#' + id).val($(this).val());
-    });
-    // Clear the list, then set up its input handlers.
-    $ul.html('');
-    if (value && value.length > 0) {
-        // Add typed value to the options
-        var attributes = {
-          tid: 0,
-          vid: vid,
-          name: value,
-          onclick: '_taxonomy_field_widget_form_click(' +
-            "'" + id + "', " +
-            "'" + $ul.attr('id') + "', " +
-            'this' +
-          ')'
-        };
-        html += '<li ' + drupalgap_attributes(attributes) + '>' + value + '</li>';
-
-        $ul.html('<li><div class="ui-loader">' +
-          '<span class="ui-icon ui-icon-loading"></span>' +
-          '</div></li>');
-        $ul.listview('refresh');
-        var query = {
-          fields: ['tid', 'name'],
-          parameters: {
-            vid: vid,
-            name: '%' + value + '%'
-          },
-          parameters_op: {
-            name: 'like'
-          }
-        };
-        taxonomy_term_index(query, {
-            success: function(terms) {
-              if (terms.length != 0) {
-                // Extract the terms into items, then drop them in the list.
-                var items = [value.toLowerCase()];
-                for (var index in terms) {
-                    if (!terms.hasOwnProperty(index)) { continue; }
-                    var term = terms[index];
-                    // Only add a value if it's not added before
-                    if ($.inArray(term.name.toLowerCase(), items) < 0) {
-                        items.push(term.name.toLowerCase());
-
-                        var attributes = {
-                          tid: term.tid,
-                          vid: vid,
-                          name: term.name,
-                          onclick: '_taxonomy_field_widget_form_click(' +
-                            "'" + id + "', " +
-                            "'" + $ul.attr('id') + "', " +
-                            'this' +
-                          ')'
-                        };
-                        html += '<li ' + drupalgap_attributes(attributes) + '>' +
-                          term.name +
-                        '</li>';
-                    }
-                }
-              }
-              $ul.html(html);
-              $ul.listview('refresh');
-              $ul.trigger('updatelayout');
-            }
-        });
-    }
-  }
-  catch (error) {
-    console.log('_taxonomy_field_widget_form_autocomplete - ' + error);
-  }
-}
-
-/**
- * Handles clicks on taxonomy term reference autocomplete widgets.
- * @param {String} id The id of the element
- * @param {String} list_id The id of the list that holds the terms.
- * @param {Object} item The list item that was just clicked.
- */
-function _taxonomy_field_widget_form_click(id, list_id, item) {
-  try {
-    var tid = $(item).attr('name');
-    var field_language = $('#' + list_id).data('field_language');
-    var field_cardinality = $('#' + list_id).data('field_cardinality');
-
-    // Search for an empty position within the field values
-    for (var i = 0; i < field_cardinality; i++) {
-      var field_id = id + '-' + field_language + '-' + i + '-value';
-
-      if (empty($('#' + field_id).val())) {
-        _taxonomy_field_widget_form_add_value(field_id, tid);
-        $('#' + field_id)
-          .val(tid)
-          .next('[data-role=button]')
-            .buttonMarkup()
-        break;
+  if ($.inArray(value.toLowerCase(), items) < 0) {
+    var options = {
+      attributes: {
+        value: value,
+        onclick: '_theme_autocomplete_click(this, \'' + autocomplete_id + '\')'
       }
-    }
+    };
 
-    $(_taxonomy_field_widget_form_autocomplete_input).val('');
-    $('#' + list_id).html('');
-
-    _taxonomy_field_widget_form_visibility(id, field_language, field_cardinality);
-  }
-  catch (error) { console.log('_taxonomy_field_widget_form_click - ' + error); }
-}
-
-/**
- * Hide autocomplete form if we reach the cardinality
- * @param {String} id The Id of the element
- * @param {String} field_language The language of the field
- * @param {Number} field_cardinality The cardinality of the field
- */
-function _taxonomy_field_widget_form_visibility(id, field_language, field_cardinality) {
-  $('#' + id + '-' + field_language + '-0-value')
-    .siblings('form')
-      .hide();
-
-  for (var i = 0; i < field_cardinality; i++) {
-    var field_id = id + '-' + field_language + '-' + i + '-value';
-
-    if (empty($('#' + field_id).val())) {
-      $('#' + field_id)
-        .siblings('form')
-          .show();
-      break;
-    }
+    $ul.append('<li>' + l(value, null, options) + '</li>');
+    $ul.listview('refresh');
+    $ul.trigger('updatelayout');
   }
 }
 
