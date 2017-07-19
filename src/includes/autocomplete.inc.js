@@ -252,12 +252,14 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
           if (result_items.length == 0) {
             if (autocomplete.empty_callback) {
               var fn = window[autocomplete.empty_callback];
-              fn(value);
+              fn(value, list, autocomplete_id);
             }
           }
           else {
             // Convert the result into an items array for a list. Each item will
             // be a JSON object with a "value" and "label" properties.
+            // When using autocomplete on taxonomy_terms,
+            // we use the taxonomy term name as item so it's used as value also
             var items = [];
             var _value = autocomplete.value;
             var _label = autocomplete.label;
@@ -267,10 +269,15 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
                 var _item = null;
                 if (_wrapped) { _item = object[_child]; }
                 else { _item = object; }
-                var item = {
-                  value: _item[_value],
-                  label: _item[_label]
-                };
+
+                if (autocomplete.entity_type == 'taxonomy_term') {
+                  var item = _item[_label];
+                } else {
+                  var item = {
+                    value: _item[_value],
+                    label: _item[_label]
+                  };
+                }
                 items.push(item);
             }
 
@@ -292,7 +299,7 @@ function _theme_autocomplete(list, e, data, autocomplete_id) {
           // Anybody want to act on the completion of the autocomplete?
           if (autocomplete.finish_callback) {
             var fn = window[autocomplete.finish_callback];
-            fn(value);
+            fn(value, list, autocomplete_id);
           }
 
         }
