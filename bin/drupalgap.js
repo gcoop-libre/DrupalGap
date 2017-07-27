@@ -6483,6 +6483,7 @@ function theme_header(variables) {
   try {
     variables.attributes['data-role'] = 'header';
     if (typeof variables.type === 'undefined') { type = 'h2'; }
+    else { type = variables.type; }
     var html = '<div ' + drupalgap_attributes(variables.attributes) + '>' +
       '<' + type + '>' + variables.text + '</' + type + '></div>';
     return html;
