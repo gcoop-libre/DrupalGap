@@ -8045,7 +8045,7 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
           // Or is it only single value fields that don't have it? We need to
           // test this.
           var use_delta = true;
-          if (form.elements[name].field_info_instance.widget.type == 'options_select') {
+          if (form.elements[name].field_info_instance.widget.type == 'options_select' && allowed_values == 1) {
             use_delta = false;
             entity[name][language] = {};
           }
@@ -8110,7 +8110,9 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
                   form
                 );
               }
-
+              if (field_value === null) {
+                continue;
+              }
               // If someone updated the key, use it.
               if (key != field_key.value) { key = field_key.value; }
 
