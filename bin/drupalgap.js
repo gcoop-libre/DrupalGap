@@ -11906,7 +11906,7 @@ function offline_try_again() {
     else {
       var msg = t('Sorry, no connection found!') + ' (' + connection + ')';
       drupalgap_alert(msg, {
-          title: 'Offline'
+          title: t('Offline')
       });
       return false;
     }
@@ -12002,7 +12002,6 @@ function system_logout_block_access_callback(options) {
     console.log('system_logout_block_access_callback - ' + error);
   }
 }
-
 /**
  * Determine whether the user has a given privilege. Optionally pass in a user
  * account JSON object for the second paramater to check that particular
