@@ -451,6 +451,12 @@ function user_pass_form_submit(form, form_state) {
             drupalgap_set_message(msg, 'warning');
           }
           drupalgap_goto('user/login');
+        },
+        error: function (error) {
+          var msg =
+            t('There was a problem sending an e-mail to your address.');
+          drupalgap_set_message(msg, 'warning');
+          drupalgap_goto('user/login');
         }
     });
   }
