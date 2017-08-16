@@ -536,7 +536,7 @@ function _theme_autocomplete_click(item, autocomplete_id) {
     ) {
       var fn =
         window[_theme_autocomplete_variables[autocomplete_id].item_onclick];
-      fn(id, $(item));
+      fn(autocomplete_id, $(item));
     }
   }
   catch (error) { console.log('_theme_autocomplete_click - ' + error); }
