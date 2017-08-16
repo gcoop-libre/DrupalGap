@@ -2072,7 +2072,7 @@ function _theme_autocomplete_click(item, autocomplete_id) {
     ) {
       var fn =
         window[_theme_autocomplete_variables[autocomplete_id].item_onclick];
-      fn(id, $(item));
+      fn(autocomplete_id, $(item));
     }
   }
   catch (error) { console.log('_theme_autocomplete_click - ' + error); }
@@ -12862,6 +12862,12 @@ function user_pass_form_submit(form, form_state) {
               t('There was a problem sending an e-mail to your address.');
             drupalgap_set_message(msg, 'warning');
           }
+          drupalgap_goto('user/login');
+        },
+        error: function (error) {
+          var msg =
+            t('There was a problem sending an e-mail to your address.');
+          drupalgap_set_message(msg, 'warning');
           drupalgap_goto('user/login');
         }
     });
