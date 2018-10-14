@@ -114,7 +114,13 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
      if (typeof(field.settings.allowed_values[0].vocabulary) != 'undefined') {
        items[delta].vid = taxonomy_vocabulary_get_vid_from_name(field.settings.allowed_values[0].vocabulary);
      }
-     items[delta].finish_callback = 'taxonomy_field_widget_form_finish_callback';
+
+     if (element.finish_callback) {
+      items[delta].finish_callback = element.finish_callback;
+     }
+     else {
+      items[delta].finish_callback = 'taxonomy_field_widget_form_finish_callback';
+     }
 
      // Set any existing item values.
      items[delta].default_value = '';
