@@ -3926,8 +3926,8 @@ function _drupalgap_form_state_values_assemble_get_element_value(id, element) {
         $.each(options, function(index, option) {
           var checkbox = $(option).children('input');
           var _value = $(checkbox).attr('value');
-          if ($(checkbox).is(':checked')) { value[_value] = _value; }
-          else { value[_value] = 0; }
+          if ($(checkbox).is(':checked')) { value[index] = _value; }
+          else { value[index] = 0; }
         });
         break;
       case 'list_boolean':
@@ -12990,7 +12990,13 @@ function taxonomy_field_formatter_view(entity_type, entity, field, instance,
      if (typeof(field.settings.allowed_values[0].vocabulary) != 'undefined') {
        items[delta].vid = taxonomy_vocabulary_get_vid_from_name(field.settings.allowed_values[0].vocabulary);
      }
-     items[delta].finish_callback = 'taxonomy_field_widget_form_finish_callback';
+
+     if (element.finish_callback) {
+      items[delta].finish_callback = element.finish_callback;
+     }
+     else {
+      items[delta].finish_callback = 'taxonomy_field_widget_form_finish_callback';
+     }
 
      // Set any existing item values.
      items[delta].default_value = '';
