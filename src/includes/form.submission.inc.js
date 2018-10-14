@@ -280,8 +280,8 @@ function _drupalgap_form_state_values_assemble_get_element_value(id, element) {
         $.each(options, function(index, option) {
           var checkbox = $(option).children('input');
           var _value = $(checkbox).attr('value');
-          if ($(checkbox).is(':checked')) { value[_value] = _value; }
-          else { value[_value] = 0; }
+          if ($(checkbox).is(':checked')) { value[index] = _value; }
+          else { value[index] = 0; }
         });
         break;
       case 'list_boolean':
